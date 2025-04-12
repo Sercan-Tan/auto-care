@@ -124,6 +124,28 @@ const formatDate = (dateString) => {
     
     return new Date(dateString).toLocaleDateString('tr-TR', options);
 };
+
+// Ücretleri para birimi formatına dönüştür
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY',
+        minimumFractionDigits: 2
+    }).format(amount || 0);
+};
+
+// Toplam maliyeti hesapla (işçilik + parça ücretleri)
+const calculateTotalCost = (service) => {
+    // İşçilik ücreti
+    const laborCost = parseFloat(service.labor_cost || 0);
+    
+    // Tüm parça ücretlerinin toplamı
+    const partsCost = service.items.reduce((total, item) => {
+        return total + parseFloat(item.part_cost || 0);
+    }, 0);
+    
+    return laborCost + partsCost;
+};
 </script>
 
 <template>
@@ -245,6 +267,10 @@ const formatDate = (dateString) => {
                                                 <span class="ml-2 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full text-xs">
                                                     {{ service.items?.length || 0 }} işlem
                                                 </span>
+                                                <!-- Toplam Tutar -->
+                                                <span class="ml-2 bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded-full text-xs text-green-800 dark:text-green-300">
+                                                    {{ formatCurrency(calculateTotalCost(service)) }}
+                                                </span>
                                             </p>
                                         </div>
                                     </div>
@@ -308,6 +334,9 @@ const formatDate = (dateString) => {
                                                         </span>
                                                         <span v-if="item.notes" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                             {{ item.notes }}
+                                                        </span>
+                                                        <span v-if="item.part_cost && parseFloat(item.part_cost) > 0" class="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1 block">
+                                                            Parça Ücreti: {{ formatCurrency(item.part_cost) }}
                                                         </span>
                                                     </div>
                                                 </div>

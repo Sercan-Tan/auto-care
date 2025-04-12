@@ -61,22 +61,26 @@ class ServiceController extends Controller
         $validated = $request->validate([
             'mileage' => 'required|integer',
             'service_date' => 'required|date',
+            'labor_cost' => 'nullable|numeric',
             'items' => 'required|array|min:1',
             'items.*.category_id' => 'required|exists:categories,id',
             'items.*.completed' => 'required|boolean',
-            'items.*.notes' => 'nullable|string'
+            'items.*.notes' => 'nullable|string',
+            'items.*.part_cost' => 'nullable|numeric'
         ]);
 
         $service = $vehicle->services()->create([
             'mileage' => $validated['mileage'],
-            'service_date' => $validated['service_date']
+            'service_date' => $validated['service_date'],
+            'labor_cost' => $validated['labor_cost'] ?? null
         ]);
 
         foreach ($validated['items'] as $item) {
             $service->items()->create([
                 'category_id' => $item['category_id'],
                 'completed' => $item['completed'],
-                'notes' => $item['notes'] ?? null
+                'notes' => $item['notes'] ?? null,
+                'part_cost' => $item['part_cost'] ?? null
             ]);
         }
 
@@ -108,15 +112,18 @@ class ServiceController extends Controller
         $validated = $request->validate([
             'mileage' => 'required|integer',
             'service_date' => 'required|date',
+            'labor_cost' => 'nullable|numeric',
             'items' => 'required|array|min:1',
             'items.*.category_id' => 'required|exists:categories,id',
             'items.*.completed' => 'required|boolean',
-            'items.*.notes' => 'nullable|string'
+            'items.*.notes' => 'nullable|string',
+            'items.*.part_cost' => 'nullable|numeric'
         ]);
 
         $service->update([
             'mileage' => $validated['mileage'],
-            'service_date' => $validated['service_date']
+            'service_date' => $validated['service_date'],
+            'labor_cost' => $validated['labor_cost'] ?? null
         ]);
 
         // Delete existing items and create new ones
@@ -126,7 +133,8 @@ class ServiceController extends Controller
             $service->items()->create([
                 'category_id' => $item['category_id'],
                 'completed' => $item['completed'],
-                'notes' => $item['notes'] ?? null
+                'notes' => $item['notes'] ?? null,
+                'part_cost' => $item['part_cost'] ?? null
             ]);
         }
 

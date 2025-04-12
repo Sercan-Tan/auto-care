@@ -69,6 +69,27 @@ const formatDate = (date) => {
 const formatMileage = (mileage) => {
     return new Intl.NumberFormat('tr-TR').format(mileage);
 };
+
+// Toplam maliyet hesaplama
+const totalCost = computed(() => {
+    let sum = 0;
+    
+    // İşçilik ücreti
+    if (props.service.labor_cost) {
+        sum += parseFloat(props.service.labor_cost);
+    }
+    
+    // Parça ücretleri
+    if (props.service.items && props.service.items.length > 0) {
+        props.service.items.forEach(item => {
+            if (item.part_cost) {
+                sum += parseFloat(item.part_cost);
+            }
+        });
+    }
+    
+    return sum;
+});
 </script>
 
 <template>
@@ -93,7 +114,7 @@ const formatMileage = (mileage) => {
                 <!-- Servis Bilgileri -->
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                     <div class="p-6">
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             <div>
                                 <p class="text-sm text-gray-600 dark:text-gray-400">Plaka No</p>
                                 <Link 
@@ -120,6 +141,12 @@ const formatMileage = (mileage) => {
                             <div>
                                 <p class="text-sm text-gray-600 dark:text-gray-400">Kilometre</p>
                                 <p class="font-medium text-gray-900 dark:text-gray-100">{{ formatMileage(service.mileage) }} km</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">İşçilik Ücreti</p>
+                                <p class="font-medium text-gray-900 dark:text-gray-100">
+                                    {{ service.labor_cost ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(service.labor_cost) : '-' }}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -171,6 +198,9 @@ const formatMileage = (mileage) => {
                                                     <p v-if="item.notes" class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                         {{ item.notes }}
                                                     </p>
+                                                    <p v-if="item.part_cost" class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                        <span class="font-medium">Parça Ücreti:</span> {{ new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.part_cost) }}
+                                                    </p>
                                                 </div>
                                             </div>
                                             <span class="px-3 py-1 text-sm rounded-full" 
@@ -182,6 +212,36 @@ const formatMileage = (mileage) => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toplam Maliyet Özeti -->
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mt-6">
+                    <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Maliyet Özeti</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">İşçilik Ücreti</p>
+                                <p class="font-medium text-gray-900 dark:text-gray-100">
+                                    {{ service.labor_cost ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(service.labor_cost) : '0,00 ₺' }}
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Parça Ücretleri Toplamı</p>
+                                <p class="font-medium text-gray-900 dark:text-gray-100">
+                                    {{ new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalCost - (service.labor_cost || 0)) }}
+                                </p>
+                            </div>
+                            
+                            <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">TOPLAM MALİYET</p>
+                                <p class="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                    {{ new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalCost) }}
+                                </p>
                             </div>
                         </div>
                     </div>

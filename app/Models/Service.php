@@ -12,6 +12,7 @@ class Service extends Model
         'vehicle_id',
         'mileage',
         'service_date',
+        'labor_cost',
     ];
 
     protected $casts = [

@@ -75,6 +75,28 @@ const formatDate = (date) => {
 const formatMileage = (mileage) => {
     return new Intl.NumberFormat('tr-TR').format(mileage);
 };
+
+// Ücretleri para birimi formatına dönüştür
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY',
+        minimumFractionDigits: 2
+    }).format(amount || 0);
+};
+
+// Toplam maliyeti hesapla (işçilik + parça ücretleri)
+const calculateTotalCost = (service) => {
+    // İşçilik ücreti
+    const laborCost = parseFloat(service.labor_cost || 0);
+    
+    // Tüm parça ücretlerinin toplamı
+    const partsCost = service.items.reduce((total, item) => {
+        return total + parseFloat(item.part_cost || 0);
+    }, 0);
+    
+    return laborCost + partsCost;
+};
 </script>
 
 <template>
@@ -142,6 +164,9 @@ const formatMileage = (mileage) => {
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                             İşlem Sayısı
                                         </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                            Toplam Tutar
+                                        </th>
                                         <th scope="col" class="relative px-6 py-3">
                                             <span class="sr-only">İşlemler</span>
                                         </th>
@@ -157,7 +182,12 @@ const formatMileage = (mileage) => {
                                                 {{ service.vehicle.plate_no }}
                                             </Link>
                                             <div class="text-sm text-gray-500 dark:text-gray-400">
+                                                <Link 
+                                                    :href="route('vehicles.show', service.vehicle.id)"
+                                                    class="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                                                >
                                                 {{ service.vehicle.brand }} {{ service.vehicle.model }}
+                                                </Link>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
@@ -173,6 +203,11 @@ const formatMileage = (mileage) => {
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="text-sm text-gray-900 dark:text-gray-100">
                                                 {{ service.items.length }} işlem
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="text-sm text-gray-900 dark:text-gray-100">
+                                                {{ formatCurrency(calculateTotalCost(service)) }}
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

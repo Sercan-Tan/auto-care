@@ -60,12 +60,14 @@ const initialItems = props.service.items.map(item => ({
     id: item.id,
     category_id: item.category_id,
     completed: item.completed,
-    notes: item.notes || ''
+    notes: item.notes || '',
+    part_cost: item.part_cost || ''
 }));
 
 const form = useForm({
     mileage: props.service.mileage,
     service_date: formatDate(props.service.service_date),
+    labor_cost: props.service.labor_cost || '',
     items: initialItems
 });
 
@@ -113,7 +115,8 @@ const addSelectedCategories = () => {
             form.items.push({
                 category_id: categoryId,
                 completed: false,
-                notes: ''
+                notes: '',
+                part_cost: ''
             });
         }
     });
@@ -159,7 +162,7 @@ const submit = () => {
                     <div class="p-6 text-gray-900 dark:text-gray-100">
                         <form @submit.prevent="submit" class="space-y-6">
                             <!-- Kilometre ve Tarih Bilgileri -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <InputLabel for="mileage" value="Kilometre" class="text-gray-900 dark:text-gray-100" />
                                     <TextInput
@@ -181,6 +184,18 @@ const submit = () => {
                                         required
                                     />
                                     <InputError :message="form.errors.service_date" class="mt-2" />
+                                </div>
+                                <div>
+                                    <InputLabel for="labor_cost" value="İşçilik Ücreti (TL)" class="text-gray-900 dark:text-gray-100" />
+                                    <TextInput
+                                        id="labor_cost"
+                                        type="number"
+                                        step="0.01"
+                                        class="mt-1 block w-full dark:bg-gray-900 dark:text-gray-100"
+                                        v-model="form.labor_cost"
+                                        placeholder="0.00"
+                                    />
+                                    <InputError :message="form.errors.labor_cost" class="mt-2" />
                                 </div>
                             </div>
 
@@ -231,9 +246,7 @@ const submit = () => {
                                             </button>
                                         </div>
                                         
-                                 
-                                        
-                                        <div>
+                                        <div class="grid grid-cols-1 gap-3">
                                             <textarea
                                                 v-model="item.notes"
                                                 placeholder="Notlar"
@@ -241,6 +254,19 @@ const submit = () => {
                                                 class="w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm"
                                             ></textarea>
                                             <InputError :message="form.errors['items.' + index + '.notes']" class="mt-1" />
+                                            
+                                            <div>
+                                                <InputLabel :for="'part_cost_' + index" value="Parça Ücreti (TL)" class="text-gray-900 dark:text-gray-100" />
+                                                <TextInput
+                                                    :id="'part_cost_' + index"
+                                                    type="number"
+                                                    step="0.01"
+                                                    class="mt-1 block w-full dark:bg-gray-900 dark:text-gray-100"
+                                                    v-model="item.part_cost"
+                                                    placeholder="0.00"
+                                                />
+                                                <InputError :message="form.errors['items.' + index + '.part_cost']" class="mt-1" />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

@@ -12,6 +12,7 @@ class ServiceItem extends Model
         'category_id',
         'completed',
         'notes',
+        'part_cost',
     ];
 
     protected $casts = [

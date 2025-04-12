@@ -12,7 +12,9 @@ class VehicleController extends Controller
     {
         $search = $request->input('search');
 
-        $vehicles = Vehicle::with('services')
+        $vehicles = Vehicle::with(['services' => function($query) {
+                $query->select('id', 'vehicle_id', 'labor_cost');
+            }])
             ->when($search, function ($query, $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('plate_no', 'like', "%{$search}%")
@@ -21,9 +23,25 @@ class VehicleController extends Controller
                         ->orWhere('owner_name', 'like', "%{$search}%");
                 });
             })
+            ->withCount([
+                'services', 
+                'services as total_labor_cost_sum' => function($query) {
+                    $query->select(\DB::raw('sum(labor_cost)'));
+                },
+                'services as total_parts_cost_sum' => function($query) {
+                    $query->join('service_items', 'services.id', '=', 'service_items.service_id')
+                          ->select(\DB::raw('sum(service_items.part_cost)'));
+                }
+            ])
             ->latest()
             ->paginate(10)
             ->withQueryString();
+
+        // Hesapla toplam maliyeti (işçilik + parça)
+        $vehicles->getCollection()->transform(function ($vehicle) {
+            $vehicle->total_cost = $vehicle->total_labor_cost_sum + $vehicle->total_parts_cost_sum;
+            return $vehicle;
+        });
 
         return Inertia::render('Vehicles/Index', [
             'vehicles' => $vehicles,
@@ -59,6 +77,17 @@ class VehicleController extends Controller
     {
         // Kategori ilişkilerini parent ilişkisiyle birlikte yükle
         $vehicle->load(['services.items.category.parent']);
+        
+        // Toplam maliyet hesaplamaları
+        $totalLaborCost = $vehicle->services->sum('labor_cost');
+        $totalPartsCost = $vehicle->services->flatMap->items->sum('part_cost');
+        $totalCost = $totalLaborCost + $totalPartsCost;
+        
+        // Maliyet bilgilerini ekle
+        $vehicle->total_labor_cost = $totalLaborCost;
+        $vehicle->total_parts_cost = $totalPartsCost;
+        $vehicle->total_cost = $totalCost;
+        
         return Inertia::render('Vehicles/Show', [
             'vehicle' => $vehicle
         ]);
