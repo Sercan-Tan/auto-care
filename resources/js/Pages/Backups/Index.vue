@@ -157,7 +157,7 @@ const openFileInput = () => {
                         <input
                             type="file"
                             ref="fileInput"
-                            accept=".zip"
+                            accept=".zip, .sqlite"
                             class="hidden"
                             @change="handleFileChange"
                         />

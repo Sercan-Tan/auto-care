@@ -32,21 +32,35 @@ class DatabaseBackupController extends Controller
     }
 
     /**
-     * Yeni bir yedek oluşturur
+     * Yeni bir yedek oluşturur (MySQL ve SQLite desteği ile)
      */
     public function create(Request $request): RedirectResponse
     {
         try {
-            // Veritabanı yedeği oluşturma komutunu çalıştır
-            Artisan::call('backup:run --only-db');
+            $connection = config('database.default');
+
+            if ($connection === 'mysql') {
+                // MySQL için yedekleme komutunu çalıştır
+                Artisan::call('backup:run --only-db');
+            } elseif ($connection === 'sqlite') {
+                $dbPath = config('database.connections.sqlite.database');
+                $backupPath = storage_path('app/private/Laravel/sqlite-backup-' . date('Y-m-d-H-i-s') . '.sqlite');        
+                if (!copy($dbPath, $backupPath)) {
+                    throw new \Exception('SQLite yedekleme işlemi başarısız oldu.');
+                }
+            } else {
+                throw new \Exception('Desteklenmeyen veritabanı türü: ' . $connection);
+            }
+
             return redirect()->route('backups.index')->with('flash.message', 'Yedekleme başarıyla oluşturuldu.');
         } catch (\Exception $e) {
             Log::error('Yedekleme oluşturma hatası: ' . $e->getMessage());
             return redirect()->route('backups.index')->with('flash.error', 'Yedekleme oluşturulurken bir hata oluştu: ' . $e->getMessage());
         }
     }
+
     /**
-     * Seçilen yedeği geri yükler
+     * Seçilen yedeği geri yükler (MySQL ve SQLite desteği ile)
      */
     public function restore(Request $request): RedirectResponse
     {
@@ -57,72 +71,80 @@ class DatabaseBackupController extends Controller
         try {
             $backupFile = $request->input('backup_file');
             $backupPath = 'Laravel/' . $backupFile;
-            
+
             if (!Storage::exists($backupPath)) {
                 return redirect()->route('backups.index')->with('flash.error', 'Yedek dosyası bulunamadı.');
             }
-            
-            // Geçici dizin oluştur
-            $tempDir = storage_path('app/restore-temp');
-            if (!file_exists($tempDir)) {
-                mkdir($tempDir, 0755, true);
-            } else {
-                // Varolan içeriği temizle
-                $this->cleanDirectory($tempDir);
-            }
-            
-            // ZIP dosyasını geçici dizine kopyala
-            $zipPath = $tempDir . '/' . $backupFile;
-            copy(Storage::path($backupPath), $zipPath);
-            
-            // ZIP dosyasını aç
-            $zip = new \ZipArchive();
-            if ($zip->open($zipPath) === true) {
-                $zip->extractTo($tempDir);
-                $zip->close();
-                
-                // SQL dosyasını bul
-                $sqlFile = $this->findSqlFile($tempDir);
-                
-                if ($sqlFile) {
-                    // Veritabanı bilgilerini al
-                    $dbName = config('database.connections.mysql.database');
-                    $dbUser = config('database.connections.mysql.username');
-                    $dbPassword = config('database.connections.mysql.password');
-                    $dbPort = config('database.connections.mysql.port', 3306);
-                    $dbHost = config('database.connections.mysql.host', '127.0.0.1');
-                    
-                    // MySQL dump yolu - config'de tanımlanan dump_binary_path'i kullan
-                    $mysqlPath = config('database.connections.mysql.dump.dump_binary_path', '/Applications/MAMP/Library/bin/');
-                    $mysqlImportPath = rtrim($mysqlPath, '/') . '/mysql';
-                    
-                    // Yedek dosyasını import etmek için komutu oluştur
-                    $command = "{$mysqlImportPath} --host={$dbHost} --port={$dbPort} --user={$dbUser} --password={$dbPassword} {$dbName} < {$sqlFile} 2>&1";
-                    
-                    // Komutu çalıştır
-                    $output = [];
-                    $return_var = 0;
-                    exec($command, $output, $return_var);
-                    
-                    // Sonucu kontrol et
-                    if ($return_var !== 0) {
-                        Log::error('Veritabanı geri yükleme hatası: ' . implode("\n", $output));
-                        return redirect()->route('backups.index')->with('flash.error', 'Veritabanı geri yüklenirken bir hata oluştu: ' . implode("\n", $output));
-                    }
-                    
-                    // Geçici dizini temizle
-                    $this->cleanDirectory($tempDir);
-                    
-                    return redirect()->route('backups.index')->with('flash.message', 'Veritabanı yedeği başarıyla geri yüklendi.');
-                } else {
-                    return redirect()->route('backups.index')->with('flash.error', 'Yedek içerisinde SQL dosyası bulunamadı.');
+
+            $connection = config('database.default');
+
+            if ($connection === 'mysql') {
+                // MySQL için geri yükleme işlemi
+                $this->restoreMySQL($backupPath);
+            } elseif ($connection === 'sqlite') {
+                // SQLite için geri yükleme işlemi
+                $dbPath = config('database.connections.sqlite.database');
+                if (!copy(Storage::path($backupPath), $dbPath)) {
+                    throw new \Exception('SQLite geri yükleme işlemi başarısız oldu.');
                 }
             } else {
-                return redirect()->route('backups.index')->with('flash.error', 'ZIP dosyası açılamadı.');
+                throw new \Exception('Desteklenmeyen veritabanı türü: ' . $connection);
             }
+
+            return redirect()->route('backups.index')->with('flash.message', 'Veritabanı yedeği başarıyla geri yüklendi.');
         } catch (\Exception $e) {
             Log::error('Yedek geri yükleme hatası: ' . $e->getMessage());
             return redirect()->route('backups.index')->with('flash.error', 'Yedek geri yüklenirken bir hata oluştu: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * MySQL için geri yükleme işlemi
+     */
+    private function restoreMySQL(string $backupPath): void
+    {
+        $tempDir = storage_path('app/restore-temp');
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        } else {
+            $this->cleanDirectory($tempDir);
+        }
+
+        $zipPath = $tempDir . '/' . basename($backupPath);
+        copy(Storage::path($backupPath), $zipPath);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath) === true) {
+            $zip->extractTo($tempDir);
+            $zip->close();
+
+            $sqlFile = $this->findSqlFile($tempDir);
+            if ($sqlFile) {
+                $dbName = config('database.connections.mysql.database');
+                $dbUser = config('database.connections.mysql.username');
+                $dbPassword = config('database.connections.mysql.password');
+                $dbPort = config('database.connections.mysql.port', 3306);
+                $dbHost = config('database.connections.mysql.host', '127.0.0.1');
+
+                $mysqlPath = config('database.connections.mysql.dump.dump_binary_path', '/Applications/MAMP/Library/bin/');
+                $mysqlImportPath = rtrim($mysqlPath, '/') . '/mysql';
+
+                $command = "{$mysqlImportPath} --host={$dbHost} --port={$dbPort} --user={$dbUser} --password={$dbPassword} {$dbName} < {$sqlFile} 2>&1";
+
+                $output = [];
+                $return_var = 0;
+                exec($command, $output, $return_var);
+
+                if ($return_var !== 0) {
+                    throw new \Exception('MySQL geri yükleme hatası: ' . implode("\n", $output));
+                }
+
+                $this->cleanDirectory($tempDir);
+            } else {
+                throw new \Exception('Yedek içerisinde SQL dosyası bulunamadı.');
+            }
+        } else {
+            throw new \Exception('ZIP dosyası açılamadı.');
         }
     }
 
@@ -157,12 +179,19 @@ class DatabaseBackupController extends Controller
     public function upload(Request $request): RedirectResponse
     {
         $request->validate([
-            'backup_file' => 'required|file|mimes:zip|max:50000', // 50MB maksimum boyut
+            'backup_file' => 'required|file|mimetypes:application/zip,application/x-sqlite3|max:50000', // 50MB maksimum boyut
         ]);
         
         try {
             $uploadedFile = $request->file('backup_file');
-            $fileName = 'uploaded_' . date('Y-m-d-H-i-s') . '.zip';
+
+            $connection = config('database.default');
+
+            if ($connection === 'sqlite') {
+                $fileName = 'uploaded_' . date('Y-m-d-H-i-s') . '.sqlite';
+            } else {
+                $fileName = 'uploaded_' . date('Y-m-d-H-i-s') . '.zip';
+            }
             
             // Dosyayı Laravel dizinine yükle
             Storage::putFileAs('Laravel', $uploadedFile, $fileName);
