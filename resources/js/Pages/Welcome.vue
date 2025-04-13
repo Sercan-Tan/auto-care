@@ -67,7 +67,7 @@ defineProps<{
             </div>
 
             <!-- Giriş Butonu -->
-            <div class="text-center">
+            <div class="text-center mb-10">
                 <Link
                     v-if="$page.props.auth.user"
                     :href="route('dashboard')"
