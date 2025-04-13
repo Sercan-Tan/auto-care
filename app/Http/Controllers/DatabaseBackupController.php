@@ -27,7 +27,11 @@ class DatabaseBackupController extends Controller
         $backupFiles = $this->getBackupFiles();
         
         return Inertia::render('Backups/Index', [
-            'backups' => $backupFiles
+            'backups' => $backupFiles,
+            'flash' => [
+                'error' => session('flash.error'),
+                'message' => session('flash.message')
+            ]
         ]);
     }
 
@@ -41,7 +45,19 @@ class DatabaseBackupController extends Controller
 
             if ($connection === 'mysql') {
                 // MySQL için yedekleme komutunu çalıştır
-                Artisan::call('backup:run --only-db');
+                $exitCode = Artisan::call('backup:run --only-db');
+                $output = Artisan::output();
+                
+                if ($exitCode !== 0) {
+                    Log::error('Artisan komutu hata kodu ile sonlandı: ' . $exitCode);
+                    Log::error('Artisan çıktısı: ' . $output);
+                    throw new \Exception('Yedekleme işlemi başarısız oldu. Hata kodu: ' . $exitCode . '. Detaylar: ' . $output);
+                }
+                
+                if (strpos($output, 'Command not found') !== false || strpos($output, 'command not found') !== false) {
+                    Log::error('Komut bulunamadı hatası tespit edildi: ' . $output);
+                    throw new \Exception('Yedekleme komutu bulunamadı. Sistem hatası: ' . $output);
+                }
             } elseif ($connection === 'sqlite') {
                 $dbPath = config('database.connections.sqlite.database');
                 $backupPath = storage_path('app/private/Laravel/sqlite-backup-' . date('Y-m-d-H-i-s') . '.sqlite');        
@@ -126,7 +142,8 @@ class DatabaseBackupController extends Controller
                 $dbPort = config('database.connections.mysql.port', 3306);
                 $dbHost = config('database.connections.mysql.host', '127.0.0.1');
 
-                $mysqlPath = config('database.connections.mysql.dump.dump_binary_path', '/Applications/MAMP/Library/bin/');
+                // MySQL yolunu yapılandırmadan al veya varsayılan olarak belirle
+                $mysqlPath = config('database.connections.mysql.dump.dump_binary_path', '/usr/bin/');
                 $mysqlImportPath = rtrim($mysqlPath, '/') . '/mysql';
 
                 $command = "{$mysqlImportPath} --host={$dbHost} --port={$dbPort} --user={$dbUser} --password={$dbPassword} {$dbName} < {$sqlFile} 2>&1";
