@@ -81,7 +81,7 @@ return [
             ],
         ],
         
-        'database_dump_path' => '/Applications/MAMP/Library/bin/mysqldump',
+        //'database_dump_path' => '/Applications/MAMP/Library/bin/mysqldump',
 
         /*
          * The database dump can be compressed to decrease disk space usage.
