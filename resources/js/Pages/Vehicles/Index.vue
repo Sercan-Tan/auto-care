@@ -8,6 +8,28 @@ import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { ref, watch } from 'vue';
 import debounce from 'lodash/debounce';
 
+// Tarih formatlama fonksiyonu
+const formatDate = (dateString) => {
+    if (!dateString) return 'Tarih yok';
+    
+    try {
+        const date = new Date(dateString);
+        
+        // Geçerli bir tarih kontrolü
+        if (isNaN(date.getTime())) {
+            return 'Geçersiz tarih';
+        }
+        
+        return date.toLocaleDateString('tr-TR', {
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric'
+        });
+    } catch (error) {
+        return 'Tarih hatası';
+    }
+};
+
 const props = defineProps({
     vehicles: {
         type: Object,
@@ -137,7 +159,7 @@ const closeModal = () => {
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div v-if="vehicle.services && vehicle.services.length" class="text-sm text-gray-900 dark:text-gray-100">
-                                                {{ new Date(vehicle.services[vehicle.services.length - 1].service_date).toLocaleDateString('tr-TR') }}
+                                                {{ formatDate(vehicle.services[vehicle.services.length - 1].service_date) }}
                                             </div>
                                             <div v-else class="text-sm text-gray-500 dark:text-gray-400">
                                                 Servis kaydı yok

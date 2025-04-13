@@ -7,6 +7,7 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CostController;
+use App\Http\Controllers\DatabaseBackupController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -29,6 +30,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('users', UserController::class);
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    
+    // Yedekleme Rotaları
+    Route::controller(DatabaseBackupController::class)->prefix('backups')->name('backups.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/create', 'create')->name('create');
+        Route::post('/restore', 'restore')->name('restore');
+        Route::post('/upload', 'upload')->name('upload');
+        Route::get('/download/{filename}', 'download')->name('download');
+        Route::delete('/delete', 'delete')->name('delete');
+    });
     //Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 

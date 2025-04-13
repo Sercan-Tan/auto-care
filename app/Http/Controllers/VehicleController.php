@@ -13,7 +13,7 @@ class VehicleController extends Controller
         $search = $request->input('search');
 
         $vehicles = Vehicle::with(['services' => function($query) {
-                $query->select('id', 'vehicle_id', 'labor_cost');
+                $query->select('id', 'vehicle_id', 'labor_cost', 'service_date');
             }])
             ->when($search, function ($query, $search) {
                 $query->where(function ($query) use ($search) {
