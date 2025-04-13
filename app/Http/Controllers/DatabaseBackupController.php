@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Response as DownloadResponse;
 
 class DatabaseBackupController extends Controller
 {
+
+    protected $backup_directory = 'app/private/Laravel/';
+
     // Constructor'dan middleware tanımlamasını kaldırıyoruz
     public function __construct()
     {
@@ -44,23 +47,109 @@ class DatabaseBackupController extends Controller
             $connection = config('database.default');
 
             if ($connection === 'mysql') {
-                // MySQL için yedekleme komutunu çalıştır
-                $exitCode = Artisan::call('backup:run --only-db');
-                $output = Artisan::output();
-                
-                if ($exitCode !== 0) {
-                    Log::error('Artisan komutu hata kodu ile sonlandı: ' . $exitCode);
-                    Log::error('Artisan çıktısı: ' . $output);
-                    throw new \Exception('Yedekleme işlemi başarısız oldu. Hata kodu: ' . $exitCode . '. Detaylar: ' . $output);
+                try {
+                    // PHP ile MySQL yedekleme işlemi
+                    $dbName = config('database.connections.mysql.database');
+                    $dbUser = config('database.connections.mysql.username');
+                    $dbPassword = config('database.connections.mysql.password');
+                    $dbHost = config('database.connections.mysql.host', '127.0.0.1');
+                    $dbPort = config('database.connections.mysql.port', 3306);
+                    
+                    $backupFileName = 'mysql-backup-' . date('Y-m-d-H-i-s') . '.sql';
+                    $backupFilePath = storage_path($this->backup_directory . $backupFileName);
+                    
+                    // Dizin yoksa oluştur
+                    if (!file_exists(dirname($backupFilePath))) {
+                        mkdir(dirname($backupFilePath), 0755, true);
+                    }
+                    
+                    // PHP PDO kullanarak tablo yapılarını ve verileri dışa aktarma
+                    $pdo = new \PDO(
+                        "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8", 
+                        $dbUser, 
+                        $dbPassword, 
+                        [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
+                    );
+                    
+                    $tables = [];
+                    $result = $pdo->query("SHOW TABLES");
+                    while ($row = $result->fetch(\PDO::FETCH_NUM)) {
+                        $tables[] = $row[0];
+                    }
+                    
+                    $backupContent = "-- Veritabanı yedeği: {$dbName}\n";
+                    $backupContent .= "-- Oluşturulma tarihi: " . date('Y-m-d H:i:s') . "\n\n";
+                    $backupContent .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+                    
+                    foreach ($tables as $table) {
+                        // Tablo yapısını al
+                        $stmt = $pdo->query("SHOW CREATE TABLE `{$table}`");
+                        $row = $stmt->fetch(\PDO::FETCH_NUM);
+                        $backupContent .= "DROP TABLE IF EXISTS `{$table}`;\n";
+                        $backupContent .= $row[1] . ";\n\n";
+                        
+                        // Tablo verilerini al
+                        $stmt = $pdo->query("SELECT * FROM `{$table}`");
+                        $rowCount = $stmt->rowCount();
+                        
+                        if ($rowCount > 0) {
+                            $backupContent .= "INSERT INTO `{$table}` VALUES\n";
+                            $rows = $stmt->fetchAll(\PDO::FETCH_NUM);
+                            $rowsCount = count($rows);
+                            
+                            foreach ($rows as $i => $row) {
+                                $backupContent .= "(";
+                                foreach ($row as $j => $value) {
+                                    if ($value === null) {
+                                        $backupContent .= "NULL";
+                                    } else {
+                                        $value = str_replace(['\\', "'"], ['\\\\', "\'"], $value);
+                                        $backupContent .= "'{$value}'";
+                                    }
+                                    if ($j < count($row) - 1) {
+                                        $backupContent .= ",";
+                                    }
+                                }
+                                $backupContent .= ")";
+                                if ($i < $rowsCount - 1) {
+                                    $backupContent .= ",\n";
+                                } else {
+                                    $backupContent .= ";\n\n";
+                                }
+                            }
+                        }
+                    }
+                    
+                    $backupContent .= "SET FOREIGN_KEY_CHECKS=1;\n";
+                    
+                    // Dosyaya yaz
+                    if (file_put_contents($backupFilePath, $backupContent) === false) {
+                        throw new \Exception('Yedekleme dosyası oluşturulamadı.');
+                    }
+                    
+                    // Dosyayı zip'le
+                    $zipFileName = 'mysql-backup-' . date('Y-m-d-H-i-s') . '.zip';
+                    $zipFilePath = storage_path($this->backup_directory . $zipFileName);
+                    
+                    $zip = new \ZipArchive();
+                    if ($zip->open($zipFilePath, \ZipArchive::CREATE) !== true) {
+                        throw new \Exception('Zip dosyası oluşturulamadı.');
+                    }
+                    
+                    $zip->addFile($backupFilePath, basename($backupFilePath));
+                    $zip->close();
+                    
+                    // SQL dosyasını sil, sadece zip'i tut
+                    unlink($backupFilePath);
+                    
+                } catch (\Exception $e) {
+                    Log::error('PHP MySQL yedekleme hatası: ' . $e->getMessage());
+                    throw new \Exception('Veritabanı yedekleme işlemi başarısız oldu: ' . $e->getMessage());
                 }
                 
-                if (strpos($output, 'Command not found') !== false || strpos($output, 'command not found') !== false) {
-                    Log::error('Komut bulunamadı hatası tespit edildi: ' . $output);
-                    throw new \Exception('Yedekleme komutu bulunamadı. Sistem hatası: ' . $output);
-                }
             } elseif ($connection === 'sqlite') {
                 $dbPath = config('database.connections.sqlite.database');
-                $backupPath = storage_path('app/private/Laravel/sqlite-backup-' . date('Y-m-d-H-i-s') . '.sqlite');        
+                $backupPath = storage_path($this->backup_directory . 'sqlite-backup-' . date('Y-m-d-H-i-s') . '.sqlite');        
                 if (!copy($dbPath, $backupPath)) {
                     throw new \Exception('SQLite yedekleme işlemi başarısız oldu.');
                 }
@@ -95,8 +184,8 @@ class DatabaseBackupController extends Controller
             $connection = config('database.default');
 
             if ($connection === 'mysql') {
-                // MySQL için geri yükleme işlemi
-                $this->restoreMySQL($backupPath);
+                // MySQL için PHP tabanlı geri yükleme işlemi (mysql komutu gerektirmez)
+                $this->restoreMySQLWithPDO($backupPath);
             } elseif ($connection === 'sqlite') {
                 // SQLite için geri yükleme işlemi
                 $dbPath = config('database.connections.sqlite.database');
@@ -139,14 +228,10 @@ class DatabaseBackupController extends Controller
                 $dbName = config('database.connections.mysql.database');
                 $dbUser = config('database.connections.mysql.username');
                 $dbPassword = config('database.connections.mysql.password');
-                $dbPort = config('database.connections.mysql.port', 3306);
                 $dbHost = config('database.connections.mysql.host', '127.0.0.1');
-
-                // MySQL yolunu yapılandırmadan al veya varsayılan olarak belirle
-                $mysqlPath = config('database.connections.mysql.dump.dump_binary_path', '/usr/bin/');
-                $mysqlImportPath = rtrim($mysqlPath, '/') . '/mysql';
-
-                $command = "{$mysqlImportPath} --host={$dbHost} --port={$dbPort} --user={$dbUser} --password={$dbPassword} {$dbName} < {$sqlFile} 2>&1";
+                $dbPort = config('database.connections.mysql.port', 3306);
+                
+                $command = "mysql --host={$dbHost} --port={$dbPort} --user={$dbUser} --password={$dbPassword} {$dbName} < {$sqlFile} 2>&1";
 
                 $output = [];
                 $return_var = 0;
@@ -156,6 +241,75 @@ class DatabaseBackupController extends Controller
                     throw new \Exception('MySQL geri yükleme hatası: ' . implode("\n", $output));
                 }
 
+                $this->cleanDirectory($tempDir);
+            } else {
+                throw new \Exception('Yedek içerisinde SQL dosyası bulunamadı.');
+            }
+        } else {
+            throw new \Exception('ZIP dosyası açılamadı.');
+        }
+    }
+    
+    /**
+     * MySQL için PHP tabanlı geri yükleme işlemi
+     */
+    private function restoreMySQLWithPDO(string $backupPath): void
+    {
+        $tempDir = storage_path('app/restore-temp');
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        } else {
+            $this->cleanDirectory($tempDir);
+        }
+
+        $zipPath = $tempDir . '/' . basename($backupPath);
+        copy(Storage::path($backupPath), $zipPath);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath) === true) {
+            $zip->extractTo($tempDir);
+            $zip->close();
+
+            $sqlFile = $this->findSqlFile($tempDir);
+            if ($sqlFile) {
+                $dbName = config('database.connections.mysql.database');
+                $dbUser = config('database.connections.mysql.username');
+                $dbPassword = config('database.connections.mysql.password');
+                $dbHost = config('database.connections.mysql.host', '127.0.0.1');
+                $dbPort = config('database.connections.mysql.port', 3306);
+                
+                // Veritabanı bağlantısı
+                $pdo = new \PDO(
+                    "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8", 
+                    $dbUser, 
+                    $dbPassword, 
+                    [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
+                );
+                
+                // Foreign key kontrolleri devre dışı bırak
+                $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+                
+                // SQL dosyasının içeriğini oku
+                $sql = file_get_contents($sqlFile);
+                
+                // SQL komutlarını ayrıştır ve çalıştır
+                $queries = $this->splitSqlQueries($sql);
+                
+                try {
+                    foreach ($queries as $query) {
+                        if (trim($query) !== '') {
+                            $pdo->exec($query);
+                        }
+                    }
+                    
+                    // Foreign key kontrolleri tekrar etkinleştir
+                    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+                } catch (\PDOException $e) {
+                    // Hata durumunda foreign key kontrollerini tekrar etkinleştir
+                    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+                    throw new \Exception('MySQL geri yükleme hatası: ' . $e->getMessage());
+                }
+                
                 $this->cleanDirectory($tempDir);
             } else {
                 throw new \Exception('Yedek içerisinde SQL dosyası bulunamadı.');
@@ -317,5 +471,37 @@ class DatabaseBackupController extends Controller
             Log::error('Yedek dosyası silme hatası: ' . $e->getMessage());
             return redirect()->route('backups.index')->with('flash.error', 'Yedek dosyası silinirken bir hata oluştu: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * SQL dosyasını farklı sorgulara ayırır
+     */
+    private function splitSqlQueries(string $sql): array
+    {
+        $queries = [];
+        $currentQuery = '';
+        $lines = explode("\n", $sql);
+        
+        foreach ($lines as $line) {
+            // Yorum satırlarını ve boş satırları atla
+            if (substr(trim($line), 0, 2) === '--' || trim($line) === '') {
+                continue;
+            }
+            
+            $currentQuery .= $line . "\n";
+            
+            // Eğer satır ";" ile bitiyorsa, yeni bir sorgu başlatılmalı
+            if (substr(trim($line), -1) === ';') {
+                $queries[] = $currentQuery;
+                $currentQuery = '';
+            }
+        }
+        
+        // Son sorgu ";" ile bitmiyorsa, onu da ekle
+        if (trim($currentQuery) !== '') {
+            $queries[] = $currentQuery;
+        }
+        
+        return $queries;
     }
 }
