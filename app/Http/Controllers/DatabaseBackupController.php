@@ -202,53 +202,6 @@ class DatabaseBackupController extends Controller
             return redirect()->route('backups.index')->with('flash.error', 'Yedek geri yüklenirken bir hata oluştu: ' . $e->getMessage());
         }
     }
-
-    /**
-     * MySQL için geri yükleme işlemi
-     */
-    private function restoreMySQL(string $backupPath): void
-    {
-        $tempDir = storage_path('app/restore-temp');
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0755, true);
-        } else {
-            $this->cleanDirectory($tempDir);
-        }
-
-        $zipPath = $tempDir . '/' . basename($backupPath);
-        copy(Storage::path($backupPath), $zipPath);
-
-        $zip = new \ZipArchive();
-        if ($zip->open($zipPath) === true) {
-            $zip->extractTo($tempDir);
-            $zip->close();
-
-            $sqlFile = $this->findSqlFile($tempDir);
-            if ($sqlFile) {
-                $dbName = config('database.connections.mysql.database');
-                $dbUser = config('database.connections.mysql.username');
-                $dbPassword = config('database.connections.mysql.password');
-                $dbHost = config('database.connections.mysql.host', '127.0.0.1');
-                $dbPort = config('database.connections.mysql.port', 3306);
-                
-                $command = "mysql --host={$dbHost} --port={$dbPort} --user={$dbUser} --password={$dbPassword} {$dbName} < {$sqlFile} 2>&1";
-
-                $output = [];
-                $return_var = 0;
-                exec($command, $output, $return_var);
-
-                if ($return_var !== 0) {
-                    throw new \Exception('MySQL geri yükleme hatası: ' . implode("\n", $output));
-                }
-
-                $this->cleanDirectory($tempDir);
-            } else {
-                throw new \Exception('Yedek içerisinde SQL dosyası bulunamadı.');
-            }
-        } else {
-            throw new \Exception('ZIP dosyası açılamadı.');
-        }
-    }
     
     /**
      * MySQL için PHP tabanlı geri yükleme işlemi
