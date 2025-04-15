@@ -5,6 +5,7 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import VehicleSearch from '@/Components/VehicleSearch.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
 interface PageProps {
@@ -15,6 +16,7 @@ interface PageProps {
 
 const showingNavigationDropdown = ref(false);
 const showFlash = ref(true);
+const showSearchModal = ref(false);
 
 // Flash mesajı için computed property
 const flash = computed(() => (usePage().props.flash || { message: null }) as PageProps['flash']);
@@ -36,7 +38,7 @@ const closeFlash = () => {
         <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
             <!-- Flash Message -->
             <div v-if="flash?.message && showFlash" 
-                 class="fixed top-4 right-4 z-50 flex items-center rounded-lg border px-4 py-3 shadow-lg bg-green-50 dark:bg-green-900/50 border-green-400 dark:border-green-800 text-green-700 dark:text-green-200"
+                 class="fixed notification-slide top-4 right-4 z-50 flex items-center rounded-lg border px-4 py-3 shadow-lg bg-green-50 dark:bg-green-900/50 border-green-400 dark:border-green-800 text-green-700 dark:text-green-200"
                  role="alert"
             >
                 <div class="flex items-center">
@@ -113,6 +115,18 @@ const closeFlash = () => {
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                            <!-- Vehicle Search Button -->
+                            <div class="mr-3">
+                                <button
+                                    @click="showSearchModal = true"
+                                    class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg text-gray-600 bg-white hover:bg-gray-50 hover:text-gray-700 focus:outline-none focus:ring focus:ring-gray-200 focus:ring-opacity-50 shadow-sm transition ease-in-out duration-150 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                                >
+                                    <svg class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>Ara</span>
+                                </button>
+                            </div>
                             <!-- Ayarlar Dropdown -->
                             <div class="relative ms-3">
                                 <Dropdown align="right" width="48">
@@ -350,7 +364,25 @@ const closeFlash = () => {
                                     Yedekleme
                                 </div>
                             </ResponsiveNavLink>
+
+
+                            <!-- Vehicle Search Button -->
+                            <div class="mr-3">
+                                <button
+                                    @click="showSearchModal = true; showingNavigationDropdown = !showingNavigationDropdown"
+                                    class="block w-full ps-3 pe-4 py-2 border-l-4 border-transparent text-start text-base font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 focus:outline-none focus:text-gray-800 dark:focus:text-gray-200 focus:bg-gray-50 dark:focus:bg-gray-700 focus:border-gray-300 dark:focus:border-gray-600 transition duration-150 ease-in-out"
+                                >
+                                    <div class="flex items-center">
+                                        <svg class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                                        </svg>
+                                        <span>Ara</span>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
+
+
                     </div>
 
                     <!-- Responsive Settings Options -->
@@ -398,6 +430,9 @@ const closeFlash = () => {
             <main>
                 <slot />
             </main>
+            
+            <!-- Vehicle Search Modal -->
+            <VehicleSearch :is-visible="showSearchModal" @close="showSearchModal = false" />
         </div>
     </div>
 </template>
@@ -414,7 +449,48 @@ const closeFlash = () => {
     }
 }
 
-.fixed {
+/* Sadece bildirim vb. küçük elementler için slideIn animasyonu */
+.notification-slide {
     animation: slideIn 0.3s ease-out;
+}
+
+/* Modal açılış animasyonları */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes modalBackdrop {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Modal animasyon stilleri - yukarıdan gelme */
+.bg-opacity-70 {
+    animation: modalBackdrop 0.35s ease-out;
+}
+
+/* Modal arkaplanı ve içerik animasyonu */
+.modal-content-animation {
+    animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 </style>

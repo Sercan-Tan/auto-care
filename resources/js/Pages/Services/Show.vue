@@ -1,7 +1,9 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+
+const showDeleteModal = ref(false);
 
 const props = defineProps({
     service: {
@@ -90,6 +92,16 @@ const totalCost = computed(() => {
     
     return sum;
 });
+
+// Servis silme işlemi
+const deleteService = () => {
+    router.delete(route('services.destroy', props.service.id), {
+        onSuccess: () => {
+            // Başarılı silme işlemi sonrası modal kapanır ve araç detay sayfasına yönlendirilir
+            showDeleteModal.value = false;
+        }
+    });
+};
 </script>
 
 <template>
@@ -159,6 +171,16 @@ const totalCost = computed(() => {
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Yapılan İşlemler</h3>
 
                             <div class="flex space-x-4">
+                                <button
+                                    @click="showDeleteModal = true"
+                                    class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-600 focus:bg-red-600 active:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Sil
+                                </button>
+                                                                
                                 <Link
                                     :href="route('services.edit', service.id)"
                                     class="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-600 focus:bg-blue-600 active:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
@@ -167,7 +189,7 @@ const totalCost = computed(() => {
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                     </svg>
                                     Düzenle
-                                </Link>
+                                </Link>                            
                             </div>
                         </div>
 
@@ -245,6 +267,35 @@ const totalCost = computed(() => {
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Silme İşlemi Onay Modalı -->
+        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Servis Kaydını Sil</h3>
+                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        Bu servis kaydını silmek istediğinizden emin misiniz?
+                        <span class="block mt-2 font-semibold">{{ formatDate(service.service_date) }} tarihli servis kaydı silinecektir.</span>
+                        Bu işlem geri alınamaz.
+                    </p>
+                </div>
+                
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button 
+                        @click="showDeleteModal = false"
+                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    >
+                        İptal
+                    </button>
+                    <button 
+                        @click="deleteService"
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                        Servis Kaydını Sil
+                    </button>
                 </div>
             </div>
         </div>

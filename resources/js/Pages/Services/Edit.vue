@@ -38,13 +38,18 @@ const formatDate = (dateString) => {
 
 // Kategori ağacını oluştur
 const categoryTree = computed(() => {
-    // Ana kategorileri (parent_id = null) bul
-    const rootCategories = props.categories.filter(c => c.parent_id === null);
+    // Ana kategorileri (parent_id = null) bul ve isme göre sırala
+    const rootCategories = props.categories
+        .filter(c => c.parent_id === null)
+        .sort((a, b) => a.name.localeCompare(b.name));
     
-    // Recursive olarak child kategorileri ekle
+    // Recursive olarak child kategorileri ekle ve her seviyede isme göre sırala
     const buildTree = (categories) => {
         return categories.map(category => {
-            const children = props.categories.filter(c => c.parent_id === category.id);
+            const children = props.categories
+                .filter(c => c.parent_id === category.id)
+                .sort((a, b) => a.name.localeCompare(b.name));
+                
             return {
                 ...category,
                 children: children.length ? buildTree(children) : []
@@ -78,6 +83,8 @@ const selectedCategories = ref(initialItems.map(item => item.category_id));
 const isModalOpen = ref(false);
 const openModal = () => {
     isModalOpen.value = true;
+    // Seçili kategorilerin üst kategorilerini otomatik aç
+    expandSelectedCategoryParents();
 };
 const closeModal = () => {
     isModalOpen.value = false;
@@ -86,6 +93,73 @@ const closeModal = () => {
 // Kategorinin alt kategorisi var mı kontrol et
 const hasChildren = (categoryId) => {
     return props.categories.some(c => c.parent_id === categoryId);
+};
+
+// Collapse/expand for category sections
+const expandedCategories = ref(new Set());
+const toggleCategorySection = (categoryId) => {
+    if (expandedCategories.value.has(categoryId)) {
+        expandedCategories.value.delete(categoryId);
+    } else {
+        expandedCategories.value.add(categoryId);
+    }
+};
+const isCategoryExpanded = (categoryId) => {
+    return expandedCategories.value.has(categoryId);
+};
+
+// Search functionality
+const searchQuery = ref('');
+const filteredCategoryTree = computed(() => {
+    if (!searchQuery.value.trim()) {
+        return categoryTree.value;
+    }
+    
+    const query = searchQuery.value.toLowerCase().trim();
+    const matchesSearch = (category) => {
+        return category.name.toLowerCase().includes(query);
+    };
+    
+    // Filter the tree recursively
+    const filterTree = (categories) => {
+        return categories
+            .map(category => {
+                // Filter children recursively
+                const filteredChildren = category.children.length 
+                    ? filterTree(category.children) 
+                    : [];
+                
+                // Include this category if it matches or has matching children
+                if (matchesSearch(category) || filteredChildren.length > 0) {
+                    return {
+                        ...category,
+                        children: filteredChildren
+                    };
+                }
+                
+                return null;
+            })
+            .filter(Boolean); // Remove null entries
+    };
+    
+    return filterTree(categoryTree.value);
+});
+
+// Find parent category id for a given category
+const findParentCategoryId = (categoryId) => {
+    const category = props.categories.find(c => c.id === categoryId);
+    return category ? category.parent_id : null;
+};
+
+// Expand all parent categories of selected items
+const expandSelectedCategoryParents = () => {
+    selectedCategories.value.forEach(categoryId => {
+        let parentId = findParentCategoryId(categoryId);
+        while (parentId) {
+            expandedCategories.value.add(parentId);
+            parentId = findParentCategoryId(parentId);
+        }
+    });
 };
 
 // Kategori seçme işlemi
@@ -303,12 +377,40 @@ const submit = () => {
                     </div>
                 </div>
                 
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            v-model="searchQuery"
+                            class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Kategorilerde ara..."
+                        />
+                    </div>
+                </div>
+                
                 <div class="p-4 overflow-y-auto flex-grow">
                     <div class="space-y-1">
-                        <!-- Kategorileri doğrudan burada işleyelim, recursive template yerine -->
-                        <div v-for="category in categoryTree" :key="category.id">
+                        <!-- Filtrelenmiş kategorileri göster -->
+                        <div v-for="category in filteredCategoryTree" :key="category.id">
                             <!-- Ana kategori -->
                             <div class="py-2 flex items-center">
+                                <button 
+                                    v-if="category.children && category.children.length" 
+                                    @click="toggleCategorySection(category.id)" 
+                                    class="mr-2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none transform transition-transform duration-200"
+                                    :class="{'rotate-90': isCategoryExpanded(category.id)}"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <div v-else class="w-5 h-5 mr-2"></div>
+                                
                                 <input 
                                     type="checkbox" 
                                     :id="'cat-' + category.id" 
@@ -318,64 +420,94 @@ const submit = () => {
                                     class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
                                     :class="{'opacity-50 cursor-not-allowed': hasChildren(category.id)}"
                                 >
-                                <label :for="'cat-' + category.id" 
-                                       class="ml-2 cursor-pointer"
-                                       :class="{
-                                           'text-gray-900 dark:text-gray-100': !hasChildren(category.id),
-                                           'text-gray-500 dark:text-gray-400 font-semibold': hasChildren(category.id)
-                                       }">
+                                <label 
+                                    :for="'cat-' + category.id" 
+                                    class="ml-2 cursor-pointer"
+                                    :class="{
+                                        'text-gray-900 dark:text-gray-100': !hasChildren(category.id),
+                                        'text-gray-500 dark:text-gray-400 font-semibold': hasChildren(category.id)
+                                    }"
+                                    @click="category.children && category.children.length ? toggleCategorySection(category.id) : null"
+                                >
                                     {{ category.name }}
                                     <span v-if="hasChildren(category.id)" class="text-xs">(Seçilemez)</span>
                                 </label>
                             </div>
                             
-                            <!-- Birinci seviye alt kategoriler -->
-                            <div v-for="child in category.children" :key="child.id">
-                                <div class="py-2 flex items-center" style="padding-left: 20px;">
-                                    <input 
-                                        type="checkbox" 
-                                        :id="'cat-' + child.id" 
-                                        :checked="selectedCategories.includes(child.id)"
-                                        @change="toggleCategory(child.id)"
-                                        :disabled="hasChildren(child.id)"
-                                        class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                                        :class="{'opacity-50 cursor-not-allowed': hasChildren(child.id)}"
-                                    >
-                                    <label :for="'cat-' + child.id" 
-                                           class="ml-2 cursor-pointer"
-                                           :class="{
-                                               'text-gray-900 dark:text-gray-100': !hasChildren(child.id),
-                                               'text-gray-500 dark:text-gray-400 font-semibold': hasChildren(child.id)
-                                           }">
-                                        {{ child.name }}
-                                        <span v-if="hasChildren(child.id)" class="text-xs">(Seçilemez)</span>
-                                    </label>
-                                </div>
-                                
-                                <!-- İkinci seviye alt kategoriler -->
-                                <div v-for="subchild in child.children" :key="subchild.id">
-                                    <div class="py-2 flex items-center" style="padding-left: 40px;">
+                            <!-- Alt kategoriler (collapse edilebilir) -->
+                            <div v-if="category.children && category.children.length && (isCategoryExpanded(category.id) || searchQuery)">
+                                <div v-for="child in category.children" :key="child.id">
+                                    <div class="py-2 flex items-center" style="padding-left: 20px;">
+                                        <button 
+                                            v-if="child.children && child.children.length" 
+                                            @click="toggleCategorySection(child.id)" 
+                                            class="mr-2 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none transform transition-transform duration-200"
+                                            :class="{'rotate-90': isCategoryExpanded(child.id)}"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        <div v-else class="w-5 h-5 mr-2"></div>
+                                        
                                         <input 
                                             type="checkbox" 
-                                            :id="'cat-' + subchild.id" 
-                                            :checked="selectedCategories.includes(subchild.id)"
-                                            @change="toggleCategory(subchild.id)"
-                                            :disabled="hasChildren(subchild.id)"
+                                            :id="'cat-' + child.id" 
+                                            :checked="selectedCategories.includes(child.id)"
+                                            @change="toggleCategory(child.id)"
+                                            :disabled="hasChildren(child.id)"
                                             class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                                            :class="{'opacity-50 cursor-not-allowed': hasChildren(subchild.id)}"
+                                            :class="{'opacity-50 cursor-not-allowed': hasChildren(child.id)}"
                                         >
-                                        <label :for="'cat-' + subchild.id" 
-                                               class="ml-2 cursor-pointer"
-                                               :class="{
-                                                   'text-gray-900 dark:text-gray-100': !hasChildren(subchild.id),
-                                                   'text-gray-500 dark:text-gray-400 font-semibold': hasChildren(subchild.id)
-                                               }">
-                                            {{ subchild.name }}
-                                            <span v-if="hasChildren(subchild.id)" class="text-xs">(Seçilemez)</span>
+                                        <label 
+                                            :for="'cat-' + child.id" 
+                                            class="ml-2 cursor-pointer"
+                                            :class="{
+                                                'text-gray-900 dark:text-gray-100': !hasChildren(child.id),
+                                                'text-gray-500 dark:text-gray-400 font-semibold': hasChildren(child.id)
+                                            }"
+                                            @click="child.children && child.children.length ? toggleCategorySection(child.id) : null"
+                                        >
+                                            {{ child.name }}
+                                            <span v-if="hasChildren(child.id)" class="text-xs">(Seçilemez)</span>
                                         </label>
+                                    </div>
+                                    
+                                    <!-- İkinci seviye alt kategoriler -->
+                                    <div v-if="child.children && child.children.length && (isCategoryExpanded(child.id) || searchQuery)">
+                                        <div v-for="subchild in child.children" :key="subchild.id">
+                                            <div class="py-2 flex items-center" style="padding-left: 40px;">
+                                                <div class="w-5 h-5 mr-2"></div>
+                                                <input 
+                                                    type="checkbox" 
+                                                    :id="'cat-' + subchild.id" 
+                                                    :checked="selectedCategories.includes(subchild.id)"
+                                                    @change="toggleCategory(subchild.id)"
+                                                    :disabled="hasChildren(subchild.id)"
+                                                    class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                                    :class="{'opacity-50 cursor-not-allowed': hasChildren(subchild.id)}"
+                                                >
+                                                <label 
+                                                    :for="'cat-' + subchild.id" 
+                                                    class="ml-2 cursor-pointer"
+                                                    :class="{
+                                                        'text-gray-900 dark:text-gray-100': !hasChildren(subchild.id),
+                                                        'text-gray-500 dark:text-gray-400 font-semibold': hasChildren(subchild.id)
+                                                    }"
+                                                >
+                                                    {{ subchild.name }}
+                                                    <span v-if="hasChildren(subchild.id)" class="text-xs">(Seçilemez)</span>
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        
+                        <!-- Sonuç bulunamadı mesajı -->
+                        <div v-if="searchQuery && filteredCategoryTree.length === 0" class="text-center py-4 text-gray-500 dark:text-gray-400">
+                            Aranan kriterlere uygun kategori bulunamadı.
                         </div>
                     </div>
                 </div>

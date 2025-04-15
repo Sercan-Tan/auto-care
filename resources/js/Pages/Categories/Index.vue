@@ -20,6 +20,19 @@ const rootCategories = computed(() => {
     return props.categories.filter(category => category.parent_id === null);
 });
 
+// Her kategori için açık/kapalı durumunu tutan obje
+const expandedCategories = ref({});
+
+// Kategori açma/kapama fonksiyonu
+const toggleCategory = (categoryId) => {
+    expandedCategories.value[categoryId] = !expandedCategories.value[categoryId];
+};
+
+// Kategori açık mı kontrolü yapan fonksiyon
+const isCategoryExpanded = (categoryId) => {
+    return !!expandedCategories.value[categoryId];
+};
+
 const confirmingDeletion = ref(false);
 const categoryToDelete = ref(null);
 
@@ -61,7 +74,6 @@ const closeModal = () => {
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900 dark:text-gray-100">
-                        
                         <div class="overflow-x-auto ring-1 ring-gray-300 dark:ring-gray-700 rounded-lg">
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-700">
@@ -81,6 +93,16 @@ const closeModal = () => {
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="flex items-center">
+                                                    <button 
+                                                        v-if="category.children && category.children.length" 
+                                                        @click="toggleCategory(category.id)" 
+                                                        class="mr-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none transform transition-transform duration-200"
+                                                        :class="{'rotate-90': isCategoryExpanded(category.id)}"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                                        </svg>
+                                                    </button>
 
                                                     <Link :href="route('categories.edit', category.id)">
                                                         <span :class="{'font-semibold': category.children && category.children.length}">
@@ -89,7 +111,9 @@ const closeModal = () => {
                                                     </Link>
 
                                                     <span v-if="category.children && category.children.length" 
-                                                        class="ml-2 text-xs text-gray-500">
+                                                        class="ml-2 text-xs text-gray-500 cursor-pointer"
+                                                        @click="toggleCategory(category.id)"
+                                                    >
                                                         ({{ category.children.length }})
                                                     </span>
                                                 </div>
@@ -114,12 +138,22 @@ const closeModal = () => {
                                             </td>
                                         </tr>
                                         
-                                        <!-- Alt kategorileri göster -->
-                                        <template v-if="category.children && category.children.length">
+                                        <!-- Alt kategorileri göster, sadece kategori açıksa -->
+                                        <template v-if="category.children && category.children.length && isCategoryExpanded(category.id)">
                                             <tr v-for="child in category.children" :key="child.id">
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <div class="flex items-center">
                                                         <div class="ml-5 flex items-center">
+                                                            <button 
+                                                                v-if="child.children && child.children.length" 
+                                                                @click="toggleCategory(child.id)" 
+                                                                class="mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none transform transition-transform duration-200"
+                                                                :class="{'rotate-90': isCategoryExpanded(child.id)}"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                                                </svg>
+                                                            </button>
                                                             <span class="text-gray-400 mr-2">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8L17.6464 12.6464C17.8417 12.8417 17.8417 13.1583 17.6464 13.3536L13 18"></path><path d="M2 2V9C2 10.0609 2.42143 11.0783 3.17157 11.8284C3.92172 12.5786 4.93913 13 6 13H17.5"></path></svg>
                                                             </span>
@@ -129,7 +163,9 @@ const closeModal = () => {
                                                                 </span>
                                                             </Link>
                                                             <span v-if="child.children && child.children.length" 
-                                                                class="ml-2 text-xs text-gray-500">
+                                                                class="ml-2 text-xs text-gray-500 cursor-pointer"
+                                                                @click="toggleCategory(child.id)"
+                                                            >
                                                                 ({{ child.children.length }})
                                                             </span>
                                                         </div>
@@ -155,9 +191,9 @@ const closeModal = () => {
                                                 </td>
                                             </tr>
                                             
-                                            <!-- Alt kategorilerin alt kategorileri -->
+                                            <!-- Alt kategorilerin alt kategorileri, sadece üst kategori açıksa -->
                                             <template v-for="child in category.children" :key="'subsub-'+child.id">
-                                                <template v-if="child.children && child.children.length">
+                                                <template v-if="child.children && child.children.length && isCategoryExpanded(category.id) && isCategoryExpanded(child.id)">
                                                     <tr v-for="subchild in child.children" :key="subchild.id">
                                                         <td class="px-6 py-4 whitespace-nowrap">
                                                             <div class="flex items-center">

@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');    
     Route::get('/costs', [CostController::class, 'index'])->name('costs.index');
     Route::resource('categories', CategoryController::class);
+    Route::get('/api/vehicles/search', [VehicleController::class, 'search'])->name('vehicles.search');
     Route::resource('vehicles', VehicleController::class);
     Route::resource('services', ServiceController::class)->except(['create', 'store']);    
     Route::get('vehicles/{vehicle}/services/create', [ServiceController::class, 'create'])->name('services.create');

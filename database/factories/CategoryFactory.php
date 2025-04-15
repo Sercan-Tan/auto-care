@@ -13,8 +13,7 @@ class CategoryFactory extends Factory
     {
         return [
             'name' => fake()->words(2, true),
-            'parent_id' => null,
-            'description' => fake()->sentence(),
+            'parent_id' => null
         ];
     }
 

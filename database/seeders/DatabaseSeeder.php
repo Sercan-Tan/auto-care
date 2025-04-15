@@ -16,5 +16,8 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@example.com',            
             'role' => 'admin',
         ]);
+
+        // Otomobil bakım kategorilerini oluştur
+        $this->call(CategorySeeder::class);
     }
 }

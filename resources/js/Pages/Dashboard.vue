@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     totalVehicles: Number,
@@ -9,6 +9,14 @@ const props = defineProps({
     pendingServices: Array,
     vehicleStats: Object
 });
+
+// Panel visibility state
+const isPanelVisible = ref(false);
+
+// Toggle panel visibility
+const togglePanel = () => {
+    isPanelVisible.value = !isPanelVisible.value;
+};
 
 // Ücretleri para birimi formatına dönüştür
 const formatCurrency = (amount) => {
@@ -122,22 +130,30 @@ const totalCost = computed(() => {
 
                 <!-- Maliyet Özeti -->
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-lg rounded-xl mb-8">
-                    <div class="p-6">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
-                                <svg class="w-5 h-5 mr-2 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                Maliyet Özeti
-                            </h3>
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center cursor-pointer" @click="togglePanel">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Maliyet Özeti
+                        </h3>
+                        <div class="flex items-center space-x-3">
                             <Link :href="route('costs.index')" 
-                                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 transition-colors duration-200">
+                                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 transition-colors duration-200"
+                                  @click.stop>
                                 <span>Maliyet Analizi</span>
                                 <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                 </svg>
                             </Link>
+                            <button class="text-gray-500 dark:text-gray-400 focus:outline-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform transition-transform" :class="{ 'rotate-180': isPanelVisible }" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
                         </div>
+                    </div>
+                    <div v-show="isPanelVisible" class="p-6">
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <!-- İşçilik Ücreti Kartı -->
@@ -199,6 +215,9 @@ const totalCost = computed(() => {
                         <div class="mt-4 text-sm text-gray-500 dark:text-gray-400 text-right italic">
                             Bu özet, son {{ recentServices.length }} servis kaydına dayanmaktadır.
                         </div>
+                    </div>
+                    <div v-if="!isPanelVisible" class="p-4 text-center text-gray-500 dark:text-gray-400">
+                        <p>Maliyet özetini görmek için panel başlığına tıklayın.</p>
                     </div>
                 </div>
 

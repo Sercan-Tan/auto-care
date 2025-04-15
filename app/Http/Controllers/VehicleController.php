@@ -129,4 +129,33 @@ class VehicleController extends Controller
         return redirect()->route('vehicles.index')
             ->with('message', 'Araç başarıyla silindi.');
     }
+
+    public function search(Request $request)
+    {
+        $query = $request->input('query');
+        
+        if (empty($query)) {
+            return response()->json([]);
+        }
+        
+        $vehicles = Vehicle::where('plate_no', 'like', "%{$query}%")
+            ->orWhere('brand', 'like', "%{$query}%")
+            ->orWhere('model', 'like', "%{$query}%")
+            ->orWhere('owner_name', 'like', "%{$query}%")
+            ->select('id', 'plate_no', 'brand', 'model', 'owner_name')
+            ->limit(5)
+            ->get()
+            ->map(function ($vehicle) {
+                return [
+                    'id' => $vehicle->id,
+                    'plate_no' => $vehicle->plate_no,
+                    'brand' => $vehicle->brand,
+                    'model' => $vehicle->model,
+                    'owner_name' => $vehicle->owner_name,
+                    'display' => $vehicle->plate_no . ' - ' . $vehicle->brand . ' ' . $vehicle->model . ' (' . $vehicle->owner_name . ')',
+                ];
+            });
+        
+        return response()->json($vehicles);
+    }
 }
