@@ -59,8 +59,8 @@ Araç Bakım & Takip Sistemi, servis süreçlerini dijitalleştirerek araç bak�
 
 1. Repoyu klonlayın
 ```bash
-git clone https://github.com/kullanici-adi/vehicle-tracking.git
-cd vehicle-tracking
+git clone https://github.com/Sercan-Tan/vehicle-tracking-services.git
+cd vehicle-tracking-services
 ```
 
 2. Bağımlılıkları yükleyin
